@@ -2,6 +2,8 @@ name: Build Windows exe
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: windows-latest
@@ -16,3 +18,9 @@ jobs:
         with:
           name: SpotifyIsland
           path: dist/SpotifyIsland.exe
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Spotify Island (latest)
+          files: dist/SpotifyIsland.exe

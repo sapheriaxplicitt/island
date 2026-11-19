@@ -1,0 +1,35 @@
+{
+  "name": "spotify-island",
+  "version": "1.0.0",
+  "description": "Плавающий островок для Windows с Spotify",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "app.spotifyisland",
+    "productName": "Spotify Island",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lyrics.js",
+      "system.js",
+      "smtc.ps1",
+      "sys.ps1",
+      "icon.png",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "icon.png"
+    },
+    "portable": {
+      "artifactName": "SpotifyIsland.exe"
+    }
+  }
+}

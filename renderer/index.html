@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <div id="island" data-mode="clock" data-lyr="0">
+    <div class="glow"></div>
+    <div class="privacy"><i id="dotMic" class="mic"></i><i id="dotCam" class="cam"></i></div>
+
+    <!-- часы -->
+    <div class="view v-clock">
+      <span class="pulse"></span><span id="clock">--:--</span>
+    </div>
+
+    <!-- свёрнутый плеер -->
+    <div class="view v-mini">
+      <img id="miniCover" alt="">
+      <span id="miniTitle"></span>
+      <canvas id="vizMini" width="30" height="16"></canvas>
+    </div>
+
+    <!-- уведомление -->
+    <div class="view v-notify">
+      <div id="nIcon" class="n-icon"></div>
+      <div class="n-text"><b id="nTitle"></b><span id="nText"></span></div>
+      <div id="nRight" class="n-right"></div>
+    </div>
+
+    <!-- развёрнутый плеер -->
+    <div class="view v-full">
+      <canvas id="vizBottom" class="viz-bottom" width="410" height="36"></canvas>
+      <div class="head">
+        <div class="cover-wrap">
+          <img id="cover" alt="">
+          <div class="badge">
+            <svg viewBox="0 0 24 24" width="11" height="11"><circle cx="12" cy="12" r="12" fill="#fff"/><path d="M5.5 9c4.2-1.2 8.6-.9 12.8 1.1M6.2 12.6c3.5-.9 7-.6 10.4 1M7 16c2.8-.6 5.4-.4 8 .8" stroke="#000" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg>
+            <span id="source">Spotify</span>
+          </div>
+        </div>
+        <div class="meta">
+          <div id="title" class="title"></div>
+          <div id="artist" class="artist"></div>
+        </div>
+        <canvas id="vizTop" class="viz-top" width="44" height="33"></canvas>
+      </div>
+      <div class="lyrics"><div id="lyrics"></div></div>
+      <div class="progress">
+        <span id="tl">0:00</span>
+        <div id="dots" class="dots"></div>
+        <span id="tr">-0:00</span>
+      </div>
+      <div class="controls">
+        <button id="bPrev" class="ctl" aria-label="Назад">
+          <svg viewBox="0 0 32 32"><path d="M15 7 4 16l11 9zM28 7 17 16l11 9z"/></svg>
+        </button>
+        <button id="bPlay" class="ctl big" aria-label="Пауза">
+          <svg id="icPause" viewBox="0 0 32 32"><rect x="7" y="5" width="6.5" height="22" rx="2.2"/><rect x="18.5" y="5" width="6.5" height="22" rx="2.2"/></svg>
+          <svg id="icPlay" viewBox="0 0 32 32" style="display:none"><path d="M9 6v20l17-10z"/></svg>
+        </button>
+        <button id="bNext" class="ctl" aria-label="Вперёд">
+          <svg viewBox="0 0 32 32"><path d="M17 7l11 9-11 9zM4 7l11 9-11 9z"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script src="renderer.js"></script>
+</body>
+</html>

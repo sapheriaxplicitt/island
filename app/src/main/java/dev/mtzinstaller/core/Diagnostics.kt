@@ -77,10 +77,10 @@ object Diagnostics {
                 else -> "открыта"
             }
         }
-        lines += "ApplyThemeForScreenshot" to describe(Recipe.APPLY_ACTIVITY)
-        lines += "ThemeGateActivity" to describe(Recipe.GATE_ACTIVITY)
-        lines += "ComponentActivity (локальные)" to describe(Recipe.LOCAL_COMPONENT_ACTIVITY)
-        lines += "ThemeDetailActivity" to describe(Recipe.DETAIL_ACTIVITY)
+        lines += "ApplyThemeForScreenshot" to describe(ThemeActivities.APPLY)
+        lines += "ThemeGateActivity" to describe(ThemeActivities.GATE)
+        lines += "ComponentActivity (локальные)" to describe(ThemeActivities.LOCAL_COMPONENT)
+        lines += "ThemeDetailActivity" to describe(ThemeActivities.DETAIL)
 
         return DiagReport(lines, activities)
     }

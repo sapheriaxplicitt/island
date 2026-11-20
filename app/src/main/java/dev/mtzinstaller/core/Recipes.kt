@@ -1,11 +1,21 @@
 package dev.mtzinstaller.core
 
+import android.content.ClipData
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
+
+/** Активности «Тем», в которые имеет смысл стучаться. */
+object ThemeActivities {
+    const val APPLY = "com.android.thememanager.ApplyThemeForScreenshot"
+    const val TAB = "com.android.thememanager.ThemeResourceTabActivity"
+    const val GATE = "com.android.thememanager.activity.ThemeGateActivity"
+    const val DETAIL = "com.android.thememanager.activity.ThemeDetailActivity"
+    const val LOCAL_COMPONENT = "com.android.thememanager.mine.local.customize.ComponentActivity"
+}
 
 /**
  * Способы передать .mtz приложению «Темы». Поведение меняется от версии к версии MIUI,
@@ -23,19 +33,19 @@ enum class Recipe(
         "ApplyThemeForScreenshot + путь",
         "Классический способ: окно применения темы, путь к файлу в extra",
         true,
-        APPLY_ACTIVITY,
+        ThemeActivities.APPLY,
     ),
     APPLY_FILE_URI(
         "ApplyThemeForScreenshot + file://",
         "То же окно, но файл передаётся как data-Uri",
         true,
-        APPLY_ACTIVITY,
+        ThemeActivities.APPLY,
     ),
     APPLY_CONTENT_URI(
         "ApplyThemeForScreenshot + content://",
         "То же окно, файл через FileProvider",
         false,
-        APPLY_ACTIVITY,
+        ThemeActivities.APPLY,
     ),
     VIEW_CONTENT_OCTET(
         "VIEW content:// octet-stream",
@@ -56,7 +66,7 @@ enum class Recipe(
         "ThemeResourceTabActivity",
         "Открыть раздел «Мои темы» в «Темах»",
         false,
-        TAB_ACTIVITY,
+        ThemeActivities.TAB,
     ),
     LAUNCH_APP(
         "Запустить «Темы»",
@@ -67,19 +77,19 @@ enum class Recipe(
         "ThemeGateActivity + файл",
         "Роутер «Тем» в HyperOS 3: отдаём ему файл и смотрим, подхватит ли",
         true,
-        GATE_ACTIVITY,
+        ThemeActivities.GATE,
     ),
     COMPONENT_LOCAL(
         "ComponentActivity + файл",
         "Экран локальных компонентов — на HyperOS 3 именно он отвечает за свои темы",
         true,
-        LOCAL_COMPONENT_ACTIVITY,
+        ThemeActivities.LOCAL_COMPONENT,
     ),
     DETAIL_LOCAL(
         "ThemeDetailActivity + файл",
         "Карточка темы: иногда открывается и для файла с диска",
         true,
-        DETAIL_ACTIVITY,
+        ThemeActivities.DETAIL,
     ),
     DEEPLINK_THEME(
         "Ссылка theme://",
@@ -98,14 +108,6 @@ enum class Recipe(
     ),
     ;
 
-    companion object {
-        const val APPLY_ACTIVITY = "com.android.thememanager.ApplyThemeForScreenshot"
-        const val TAB_ACTIVITY = "com.android.thememanager.ThemeResourceTabActivity"
-        const val GATE_ACTIVITY = "com.android.thememanager.activity.ThemeGateActivity"
-        const val DETAIL_ACTIVITY = "com.android.thememanager.activity.ThemeDetailActivity"
-        const val LOCAL_COMPONENT_ACTIVITY =
-            "com.android.thememanager.mine.local.customize.ComponentActivity"
-    }
 }
 
 object RecipeBuilder {
@@ -120,7 +122,7 @@ object RecipeBuilder {
             requireNotNull(public) { "файл не скопирован в общую память" }.absolutePath
 
         fun applyIntent(): Intent = Intent()
-            .setComponent(ComponentName(pkg, Recipe.APPLY_ACTIVITY))
+            .setComponent(ComponentName(pkg, ThemeActivities.APPLY))
             .putExtra("api_called_from", "ThemeEditor")
             .putExtra("ver2_step", "ver2_step_apply")
 
@@ -151,18 +153,18 @@ object RecipeBuilder {
                 .setPackage(pkg)
 
             Recipe.THEME_TAB -> Intent()
-                .setComponent(ComponentName(pkg, Recipe.TAB_ACTIVITY))
+                .setComponent(ComponentName(pkg, ThemeActivities.TAB))
 
             Recipe.LAUNCH_APP -> context.packageManager.getLaunchIntentForPackage(pkg)
                 ?: throw IllegalStateException("у «Тем» нет экрана запуска")
 
-            Recipe.GATE_FILE -> withFile(context, Recipe.GATE_ACTIVITY, internal, publicPath())
+            Recipe.GATE_FILE -> withFile(context, ThemeActivities.GATE, internal, publicPath())
 
             Recipe.COMPONENT_LOCAL ->
-                withFile(context, Recipe.LOCAL_COMPONENT_ACTIVITY, internal, publicPath())
+                withFile(context, ThemeActivities.LOCAL_COMPONENT, internal, publicPath())
                     .putExtra("REQUEST_RESOURCE_CODE", "theme")
 
-            Recipe.DETAIL_LOCAL -> withFile(context, Recipe.DETAIL_ACTIVITY, internal, publicPath())
+            Recipe.DETAIL_LOCAL -> withFile(context, ThemeActivities.DETAIL, internal, publicPath())
 
             Recipe.DEEPLINK_THEME -> Intent(Intent.ACTION_VIEW)
                 .setData(
@@ -192,15 +194,16 @@ object RecipeBuilder {
      */
     private fun withFile(context: Context, activity: String, internal: File, path: String): Intent {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", internal)
-        return Intent()
+        val intent = Intent()
             .setComponent(ComponentName(ThemeInstaller.THEME_PKG, activity))
             .putExtra("theme_file_path", path)
             .putExtra("themeFilePath", path)
             .putExtra("resource_path", path)
             .putExtra("file_path", path)
             .putExtra("android.intent.extra.STREAM", uri)
-            .setClipData(android.content.ClipData.newRawUri("theme", uri))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.clipData = ClipData.newRawUri("theme", uri)
+        return intent
     }
 
     /** Произвольная активность «Тем» — для ручного перебора в диагностике. */

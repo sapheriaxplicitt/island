@@ -12,7 +12,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +52,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -100,7 +102,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Green = Color(0xFF2E9E5B)
+private val Green = Sync.Ok
 
 @Composable
 fun AppRoot(vm: MainViewModel) {
@@ -313,20 +315,20 @@ private fun HeroCard(onPick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(colors.primaryContainer, colors.tertiaryContainer)))
+            .background(Brush.verticalGradient(listOf(Sync.CardHigh, Sync.Black)))
+            .border(1.dp, colors.outline, RoundedCornerShape(28.dp))
             .padding(22.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
                 "Темы для MIUI и HyperOS",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = colors.onPrimaryContainer,
+                color = colors.onSurface,
             )
             Text(
                 "Выберите файл .mtz — покажу превью и состав темы, а потом установлю её в пару нажатий.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = colors.onPrimaryContainer.copy(alpha = 0.85f),
+                color = colors.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
             Button(onClick = onPick) {
@@ -340,7 +342,11 @@ private fun HeroCard(onPick: () -> Unit) {
 
 @Composable
 private fun LastThemeCard(entry: ThemeEntry, cover: File, onReapply: () -> Unit, onPin: () -> Unit) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    OutlinedCard(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(containerColor = Sync.Card),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             CoverImage(
                 file = cover,
@@ -388,7 +394,11 @@ private fun LastThemeCard(entry: ThemeEntry, cover: File, onReapply: () -> Unit,
 
 @Composable
 private fun StatusCard(vm: MainViewModel, onDiagnostics: () -> Unit) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    OutlinedCard(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(containerColor = Sync.Card),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             StatusLine(
                 label = "Система",
@@ -444,7 +454,8 @@ private fun ThemeRow(entry: ThemeEntry, cover: File, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = Sync.Card),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CoverImage(

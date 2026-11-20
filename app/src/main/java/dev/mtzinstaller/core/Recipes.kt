@@ -108,6 +108,10 @@ enum class Recipe(
     ),
     ;
 
+    /** Способ, который может применить тему, а не просто открыть приложение. */
+    val canApply: Boolean
+        get() = this != GATE_FILE && this != THEME_TAB && this != LAUNCH_APP
+
 }
 
 object RecipeBuilder {

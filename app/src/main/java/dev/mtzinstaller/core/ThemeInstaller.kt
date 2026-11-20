@@ -110,18 +110,20 @@ object ThemeInstaller {
     }.getOrDefault(false)
 
     private fun recipesFor(method: InstallMethod): List<Recipe> = when (method) {
+        // Сначала то, что умеет применить тему само; ThemeGateActivity и «Мои темы» —
+        // в конце, потому что они просто открывают приложение и всегда «принимают» запрос.
         InstallMethod.DIRECT -> listOf(
             Recipe.APPLY_PATH,
             Recipe.APPLY_FILE_URI,
             Recipe.APPLY_CONTENT_URI,
             Recipe.ACTION_MIUI_APPLY,
             Recipe.DEEPLINK_THEME,
-            Recipe.GATE_FILE,
             Recipe.COMPONENT_LOCAL,
             Recipe.DETAIL_LOCAL,
             Recipe.VIEW_CONTENT_OCTET,
             Recipe.VIEW_CONTENT_MTZ,
             Recipe.VIEW_MIUI_MIME,
+            Recipe.GATE_FILE,
             Recipe.THEME_TAB,
         )
         InstallMethod.OPEN_WITH -> listOf(
@@ -166,11 +168,20 @@ object ThemeInstaller {
             }
             val error = attempt(context, recipe, src, public)
             if (error == null) {
-                log += "${recipe.title}: запрос принят"
+                log += if (recipe.canApply) {
+                    "${recipe.title}: запрос принят"
+                } else {
+                    "${recipe.title}: приложение открылось, но тему это не применяет"
+                }
                 return InstallResult(
                     ok = true,
-                    message = "«Темы» получили запрос (${recipe.title}). " +
-                        "Если окно не открылось — откройте диагностику.",
+                    message = if (recipe.canApply) {
+                        "«Темы» приняли запрос (${recipe.title}). " +
+                            "Если окно применения не появилось — откройте диагностику."
+                    } else {
+                        "Открылись только «Темы» (${recipe.title}) — применить тему " +
+                            "запросом система не дала. Импортируйте её вручную."
+                    },
                     recipe = recipe,
                     log = log,
                 )
@@ -209,7 +220,12 @@ object ThemeInstaller {
         }
         val error = attempt(context, recipe, src, public)
         return if (error == null) {
-            InstallResult(true, "${recipe.title}: запрос принят", recipe)
+            val note = if (recipe.canApply) {
+                "запрос принят"
+            } else {
+                "приложение открылось, но тему это не применяет"
+            }
+            InstallResult(true, "${recipe.title}: $note", recipe)
         } else {
             InstallResult(false, "${recipe.title}: $error", recipe)
         }

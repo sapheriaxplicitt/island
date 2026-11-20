@@ -30,8 +30,6 @@ data class DiagReport(
 
 object Diagnostics {
 
-    private val INTERESTING = listOf("apply", "import", "theme", "detail", "tab", "local", "mine")
-
     fun collect(context: Context): DiagReport {
         val pm = context.packageManager
         val lines = ArrayList<Pair<String, String>>()
@@ -67,17 +65,22 @@ object Diagnostics {
             val info = pm.getPackageInfo(ThemeInstaller.THEME_PKG, PackageManager.GET_ACTIVITIES)
             info.activities.orEmpty()
                 .map { ThemeActivity(it.name, it.exported, it.permission) }
-                .filter { a -> INTERESTING.any { it in a.name.lowercase() } }
                 .sortedWith(compareByDescending<ThemeActivity> { it.exported }.thenBy { it.name })
         }.getOrDefault(emptyList())
 
-        val applyInfo = activities.firstOrNull { it.name == Recipe.APPLY_ACTIVITY }
-        lines += "ApplyThemeForScreenshot" to when {
-            applyInfo == null -> "НЕТ в этой версии «Тем»"
-            !applyInfo.exported -> "есть, но ЗАКРЫТА для других приложений"
-            applyInfo.permission != null -> "открыта, нужна ${applyInfo.permission}"
-            else -> "открыта"
+        fun describe(name: String): String {
+            val info = activities.firstOrNull { it.name == name }
+            return when {
+                info == null -> "НЕТ в этой версии «Тем»"
+                !info.exported -> "есть, но ЗАКРЫТА для других приложений"
+                info.permission != null -> "открыта, нужна ${info.permission}"
+                else -> "открыта"
+            }
         }
+        lines += "ApplyThemeForScreenshot" to describe(Recipe.APPLY_ACTIVITY)
+        lines += "ThemeGateActivity" to describe(Recipe.GATE_ACTIVITY)
+        lines += "ComponentActivity (локальные)" to describe(Recipe.LOCAL_COMPONENT_ACTIVITY)
+        lines += "ThemeDetailActivity" to describe(Recipe.DETAIL_ACTIVITY)
 
         return DiagReport(lines, activities)
     }

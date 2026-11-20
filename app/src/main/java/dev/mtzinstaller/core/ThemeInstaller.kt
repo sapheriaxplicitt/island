@@ -100,18 +100,34 @@ object ThemeInstaller {
     suspend fun publicCopy(context: Context, src: File, title: String): File? =
         if (!hasStorageAccess(context)) null else withContext(Dispatchers.IO) { copyToPublic(src, title) }
 
+    /** Есть ли такая активность и открыта ли она для сторонних приложений. */
+    fun activityExists(context: Context, name: String): Boolean = runCatching {
+        @Suppress("DEPRECATION")
+        context.packageManager
+            .getPackageInfo(THEME_PKG, PackageManager.GET_ACTIVITIES)
+            .activities.orEmpty()
+            .any { it.name == name && it.exported }
+    }.getOrDefault(false)
+
     private fun recipesFor(method: InstallMethod): List<Recipe> = when (method) {
         InstallMethod.DIRECT -> listOf(
             Recipe.APPLY_PATH,
             Recipe.APPLY_FILE_URI,
             Recipe.APPLY_CONTENT_URI,
+            Recipe.ACTION_MIUI_APPLY,
+            Recipe.DEEPLINK_THEME,
+            Recipe.GATE_FILE,
+            Recipe.COMPONENT_LOCAL,
+            Recipe.DETAIL_LOCAL,
             Recipe.VIEW_CONTENT_OCTET,
             Recipe.VIEW_CONTENT_MTZ,
+            Recipe.VIEW_MIUI_MIME,
             Recipe.THEME_TAB,
         )
         InstallMethod.OPEN_WITH -> listOf(
             Recipe.VIEW_CONTENT_OCTET,
             Recipe.VIEW_CONTENT_MTZ,
+            Recipe.VIEW_MIUI_MIME,
             Recipe.APPLY_CONTENT_URI,
             Recipe.APPLY_PATH,
         )
@@ -134,7 +150,16 @@ object ThemeInstaller {
         val public = runCatching { publicCopy(context, src, title) }.getOrNull()
         val log = ArrayList<String>()
 
+        val missing = HashSet<String>()
         for (recipe in recipesFor(method)) {
+            val target = recipe.component
+            if (target != null && !activityExists(context, target)) {
+                if (missing.add(target)) {
+                    log += "${target.substringAfterLast('.')}: нет в этой версии «Тем» — " +
+                        "все способы через неё пропущены"
+                }
+                continue
+            }
             if (recipe.needsPublicFile && public == null) {
                 log += "${recipe.title}: пропущен, нет доступа к файлам"
                 continue
@@ -166,6 +191,16 @@ object ThemeInstaller {
         title: String,
         recipe: Recipe,
     ): InstallResult {
+        recipe.component?.let { target ->
+            if (!activityExists(context, target)) {
+                return InstallResult(
+                    false,
+                    "${recipe.title}: активности ${target.substringAfterLast('.')} " +
+                        "нет в этой версии «Тем»",
+                    recipe,
+                )
+            }
+        }
         val public = if (recipe.needsPublicFile) {
             runCatching { publicCopy(context, src, title) }.getOrNull()
                 ?: return InstallResult(false, "${recipe.title}: нужен доступ к файлам", recipe)
@@ -190,7 +225,7 @@ object ThemeInstaller {
         val public = runCatching { publicCopy(context, src, title) }.getOrNull()
         val short = activity.substringAfterLast('.')
         return try {
-            fire(context, RecipeBuilder.buildCustom(context, activity, public))
+            fire(context, RecipeBuilder.buildCustom(context, activity, src, public))
             InstallResult(true, "$short: запрос принят")
         } catch (e: Exception) {
             InstallResult(false, "$short: ${describe(e)}")

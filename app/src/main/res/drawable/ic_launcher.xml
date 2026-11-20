@@ -43,7 +43,19 @@
         </path>
         <path
             android:pathData="M110.39,85.996 C113.204,83.181 117.769,83.181 120.583,85.996 C123.398,88.811 123.398,93.375 120.583,96.19 L98.4072,118.366 C95.5926,121.18 91.0282,121.18 88.2136,118.366 L66.0376,96.19 C63.223,93.375 63.223,88.811 66.0376,85.996 C68.8522,83.181 73.4166,83.181 76.2312,85.996 L93.3104,103.075 L110.39,85.996 Z"
-            android:fillColor="#3DFFFFFF" />
+            android:fillColor="#4DFFFFFF"
+            android:strokeWidth="1.6">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="93" android:startY="84"
+                    android:endX="93" android:endY="122">
+                    <item android:offset="0" android:color="#B3FFFFFF" />
+                    <item android:offset="0.5" android:color="#40FFFFFF" />
+                    <item android:offset="1" android:color="#26FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
         <path
             android:pathData="M53.3936,77.7872 L75.5696,55.6112 L97.7456,77.7872"
             android:strokeColor="#FFFFFFFF"

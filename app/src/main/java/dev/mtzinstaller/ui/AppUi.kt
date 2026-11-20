@@ -141,7 +141,11 @@ fun AppRoot(vm: MainViewModel) {
 
     Box(Modifier.fillMaxSize()) {
         val detail = vm.detail
-        if (detail != null) {
+        val diag = vm.diag
+        if (diag != null) {
+            BackHandler { vm.closeDiagnostics() }
+            DiagScreen(vm = vm, report = diag, onBack = { vm.closeDiagnostics() })
+        } else if (detail != null) {
             BackHandler { vm.closeDetail() }
             DetailScreen(
                 detail = detail,
@@ -155,6 +159,7 @@ fun AppRoot(vm: MainViewModel) {
                 vm = vm,
                 onPick = { picker.launch(arrayOf("*/*")) },
                 onSettings = { showSettings = true },
+                onDiagnostics = { vm.openDiagnostics() },
                 onOpen = { vm.open(it) },
             )
         }
@@ -204,6 +209,10 @@ fun AppRoot(vm: MainViewModel) {
             current = vm.method,
             onSelect = { vm.updateMethod(it) },
             onOpenThemes = { vm.openThemeManager() },
+            onDiagnostics = {
+                showSettings = false
+                vm.openDiagnostics()
+            },
             onDismiss = { showSettings = false },
         )
     }
@@ -236,6 +245,7 @@ private fun HomeScreen(
     vm: MainViewModel,
     onPick: () -> Unit,
     onSettings: () -> Unit,
+    onDiagnostics: () -> Unit,
     onOpen: (ThemeEntry) -> Unit,
 ) {
     Scaffold(
@@ -270,7 +280,7 @@ private fun HomeScreen(
                     )
                 }
             }
-            item { StatusCard(vm) }
+            item { StatusCard(vm, onDiagnostics) }
             item {
                 Text(
                     text = if (vm.themes.isEmpty()) "Библиотека" else "Библиотека · ${vm.themes.size}",
@@ -377,7 +387,7 @@ private fun LastThemeCard(entry: ThemeEntry, cover: File, onReapply: () -> Unit,
 }
 
 @Composable
-private fun StatusCard(vm: MainViewModel) {
+private fun StatusCard(vm: MainViewModel, onDiagnostics: () -> Unit) {
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             StatusLine(
@@ -395,6 +405,10 @@ private fun StatusCard(vm: MainViewModel) {
                 ok = vm.themeManager != null || !vm.statusLoaded,
             )
             StatusLine(label = "Способ установки", value = vm.method.title, ok = null)
+            TextButton(
+                onClick = onDiagnostics,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+            ) { Text("Тема не применяется? Диагностика") }
         }
     }
 }
@@ -784,6 +798,7 @@ private fun SettingsDialog(
     current: InstallMethod,
     onSelect: (InstallMethod) -> Unit,
     onOpenThemes: () -> Unit,
+    onDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -800,6 +815,9 @@ private fun SettingsDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                OutlinedButton(onClick = onDiagnostics, modifier = Modifier.fillMaxWidth()) {
+                    Text("Диагностика")
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Готово") } },

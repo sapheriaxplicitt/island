@@ -2,14 +2,12 @@ package dev.mtzinstaller.core
 
 import android.Manifest
 import android.content.ActivityNotFoundException
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -30,12 +28,16 @@ enum class InstallMethod(val title: String, val hint: String) {
     ),
 }
 
-data class InstallResult(val ok: Boolean, val message: String)
+data class InstallResult(
+    val ok: Boolean,
+    val message: String,
+    val recipe: Recipe? = null,
+    val log: List<String> = emptyList(),
+)
 
 object ThemeInstaller {
 
     const val THEME_PKG = "com.android.thememanager"
-    private const val APPLY_ACTIVITY = "com.android.thememanager.ApplyThemeForScreenshot"
 
     fun themeManagerVersion(context: Context): String? = try {
         @Suppress("DEPRECATION")
@@ -61,7 +63,7 @@ object ThemeInstaller {
         return null
     }
 
-    private fun prop(name: String): String? = runCatching {
+    fun prop(name: String): String? = runCatching {
         val process = ProcessBuilder("getprop", name).redirectErrorStream(true).start()
         val out = process.inputStream.bufferedReader().use { it.readText() }.trim()
         process.waitFor()
@@ -94,9 +96,29 @@ object ThemeInstaller {
         return out
     }
 
-    /**
-     * Пробует выбранный способ, а если система его не принимает — следующие по очереди.
-     */
+    /** Копия файла в общей памяти — нужна «Темам» для прямого применения. */
+    suspend fun publicCopy(context: Context, src: File, title: String): File? =
+        if (!hasStorageAccess(context)) null else withContext(Dispatchers.IO) { copyToPublic(src, title) }
+
+    private fun recipesFor(method: InstallMethod): List<Recipe> = when (method) {
+        InstallMethod.DIRECT -> listOf(
+            Recipe.APPLY_PATH,
+            Recipe.APPLY_FILE_URI,
+            Recipe.APPLY_CONTENT_URI,
+            Recipe.VIEW_CONTENT_OCTET,
+            Recipe.VIEW_CONTENT_MTZ,
+            Recipe.THEME_TAB,
+        )
+        InstallMethod.OPEN_WITH -> listOf(
+            Recipe.VIEW_CONTENT_OCTET,
+            Recipe.VIEW_CONTENT_MTZ,
+            Recipe.APPLY_CONTENT_URI,
+            Recipe.APPLY_PATH,
+        )
+        InstallMethod.COPY_ONLY -> listOf(Recipe.LAUNCH_APP)
+    }
+
+    /** Пробует способы по очереди и запоминает, что ответила система на каждый. */
     suspend fun install(
         context: Context,
         src: File,
@@ -109,77 +131,99 @@ object ThemeInstaller {
                 "Приложение «Темы» не найдено. Установка .mtz работает только на MIUI / HyperOS.",
             )
         }
-        val order = when (method) {
-            InstallMethod.DIRECT -> listOf(InstallMethod.DIRECT, InstallMethod.OPEN_WITH, InstallMethod.COPY_ONLY)
-            InstallMethod.OPEN_WITH -> listOf(InstallMethod.OPEN_WITH, InstallMethod.DIRECT, InstallMethod.COPY_ONLY)
-            InstallMethod.COPY_ONLY -> listOf(InstallMethod.COPY_ONLY)
-        }
+        val public = runCatching { publicCopy(context, src, title) }.getOrNull()
+        val log = ArrayList<String>()
 
-        var lastError: String? = null
-        var publicFile: File? = null
-        for (m in order) {
-            try {
-                if (m != InstallMethod.OPEN_WITH) {
-                    if (!hasStorageAccess(context)) {
-                        lastError = "нет доступа к файлам"
-                        continue
-                    }
-                    if (publicFile == null) {
-                        publicFile = withContext(Dispatchers.IO) { copyToPublic(src, title) }
-                    }
-                }
-                val target = publicFile
-                withContext(Dispatchers.Main) { startIntent(context, m, src, target) }
-
-                val note = if (m == method) "" else " (запасной способ: ${m.title})"
-                val text = when (m) {
-                    InstallMethod.DIRECT -> "Открыто окно применения темы$note"
-                    InstallMethod.OPEN_WITH -> "Тема передана в «Темы»$note"
-                    InstallMethod.COPY_ONLY ->
-                        "Файл сохранён в Загрузки/MTZ Installer — импортируйте его в «Темах»$note"
-                }
-                return InstallResult(true, text)
-            } catch (e: ActivityNotFoundException) {
-                lastError = e.message
-            } catch (e: SecurityException) {
-                lastError = e.message
-            } catch (e: IOException) {
-                lastError = e.message
-            } catch (e: IllegalArgumentException) {
-                lastError = e.message
+        for (recipe in recipesFor(method)) {
+            if (recipe.needsPublicFile && public == null) {
+                log += "${recipe.title}: пропущен, нет доступа к файлам"
+                continue
             }
+            val error = attempt(context, recipe, src, public)
+            if (error == null) {
+                log += "${recipe.title}: запрос принят"
+                return InstallResult(
+                    ok = true,
+                    message = "«Темы» получили запрос (${recipe.title}). " +
+                        "Если окно не открылось — откройте диагностику.",
+                    recipe = recipe,
+                    log = log,
+                )
+            }
+            log += "${recipe.title}: $error"
         }
-        return InstallResult(false, "Не удалось установить: ${lastError ?: "неизвестная ошибка"}")
+        return InstallResult(
+            ok = false,
+            message = "Ни один способ не сработал. Откройте диагностику и пришлите отчёт.",
+            log = log,
+        )
     }
 
-    private fun startIntent(context: Context, method: InstallMethod, internal: File, public: File?) {
-        when (method) {
-            InstallMethod.DIRECT -> {
-                val path = requireNotNull(public) { "файл не скопирован" }.absolutePath
-                val intent = Intent()
-                    .setComponent(ComponentName(THEME_PKG, APPLY_ACTIVITY))
-                    .putExtra("theme_file_path", path)
-                    .putExtra("api_called_from", "ThemeEditor")
-                    .putExtra("ver2_step", "ver2_step_apply")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            }
-
-            InstallMethod.OPEN_WITH -> {
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", internal)
-                val intent = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/octet-stream")
-                    .setPackage(THEME_PKG)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            }
-
-            InstallMethod.COPY_ONLY -> {
-                val intent = context.packageManager.getLaunchIntentForPackage(THEME_PKG)
-                    ?: throw ActivityNotFoundException("«Темы» не найдены")
-                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+    /** Один способ, без запасных — для экрана диагностики. */
+    suspend fun runRecipe(
+        context: Context,
+        src: File,
+        title: String,
+        recipe: Recipe,
+    ): InstallResult {
+        val public = if (recipe.needsPublicFile) {
+            runCatching { publicCopy(context, src, title) }.getOrNull()
+                ?: return InstallResult(false, "${recipe.title}: нужен доступ к файлам", recipe)
+        } else {
+            runCatching { publicCopy(context, src, title) }.getOrNull()
         }
+        val error = attempt(context, recipe, src, public)
+        return if (error == null) {
+            InstallResult(true, "${recipe.title}: запрос принят", recipe)
+        } else {
+            InstallResult(false, "${recipe.title}: $error", recipe)
+        }
+    }
+
+    /** Любая активность «Тем», выбранная вручную в диагностике. */
+    suspend fun runCustom(
+        context: Context,
+        src: File,
+        title: String,
+        activity: String,
+    ): InstallResult {
+        val public = runCatching { publicCopy(context, src, title) }.getOrNull()
+        val short = activity.substringAfterLast('.')
+        return try {
+            fire(context, RecipeBuilder.buildCustom(context, activity, public))
+            InstallResult(true, "$short: запрос принят")
+        } catch (e: Exception) {
+            InstallResult(false, "$short: ${describe(e)}")
+        }
+    }
+
+    /** @return null если запрос ушёл, иначе текст ошибки. */
+    private suspend fun attempt(
+        context: Context,
+        recipe: Recipe,
+        src: File,
+        public: File?,
+    ): String? = try {
+        fire(context, RecipeBuilder.build(context, recipe, src, public))
+        null
+    } catch (e: Exception) {
+        describe(e)
+    }
+
+    private suspend fun fire(context: Context, intent: Intent) {
+        @Suppress("DEPRECATION")
+        val resolved = context.packageManager.resolveActivity(intent, 0)
+        if (resolved == null && intent.component != null) {
+            throw ActivityNotFoundException("активности нет или она закрыта")
+        }
+        withContext(Dispatchers.Main) { context.startActivity(intent) }
+    }
+
+    private fun describe(e: Exception): String = when (e) {
+        is ActivityNotFoundException -> "активность не найдена"
+        is SecurityException -> "система запретила доступ"
+        is IOException -> "ошибка файла: ${e.message}"
+        else -> e.javaClass.simpleName + (e.message?.let { ": $it" } ?: "")
     }
 
     fun openThemeManager(context: Context): Boolean {

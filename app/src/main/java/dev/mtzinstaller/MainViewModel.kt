@@ -10,7 +10,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mtzinstaller.core.DiagReport
+import dev.mtzinstaller.core.Diagnostics
 import dev.mtzinstaller.core.InstallMethod
+import dev.mtzinstaller.core.Recipe
 import dev.mtzinstaller.core.MtzInfo
 import dev.mtzinstaller.core.MtzParser
 import dev.mtzinstaller.core.ThemeEntry
@@ -46,6 +49,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var themeManager by mutableStateOf<String?>(null)
         private set
     var statusLoaded by mutableStateOf(false)
+        private set
+    var diag by mutableStateOf<DiagReport?>(null)
+        private set
+    var diagLog by mutableStateOf<List<String>>(emptyList())
         private set
     var method by mutableStateOf(
         runCatching { InstallMethod.valueOf(prefs.getString("method", null) ?: "") }
@@ -134,6 +141,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 busy = null
             }
+            if (result.log.isNotEmpty()) diagLog = result.log + diagLog
             if (result.ok) {
                 library.setLastApplied(entry.id)
                 lastApplied = entry
@@ -158,6 +166,66 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!Reapply.requestPin(getApplication(), entry.title)) {
             message = "Лаунчер не поддерживает закрепление ярлыков"
         }
+    }
+
+    // ------------------------------------------------------------ Диагностика
+
+    fun openDiagnostics() {
+        viewModelScope.launch {
+            busy = "Собираю данные…"
+            diag = withContext(Dispatchers.IO) { Diagnostics.collect(getApplication()) }
+            busy = null
+        }
+    }
+
+    fun closeDiagnostics() {
+        diag = null
+    }
+
+    /** Тема, на которой гоняем способы в диагностике. */
+    private fun probeTarget(): ThemeEntry? = lastApplied ?: themes.firstOrNull()
+
+    fun probe(recipe: Recipe) {
+        val entry = probeTarget()
+        if (entry == null) {
+            message = "Сначала импортируйте тему — без файла проверять нечего"
+            return
+        }
+        viewModelScope.launch {
+            val result = ThemeInstaller.runRecipe(
+                getApplication(), library.fileOf(entry), entry.title, recipe,
+            )
+            diagLog = listOf(result.message) + diagLog
+            message = result.message
+        }
+    }
+
+    fun probeActivity(activity: String) {
+        val entry = probeTarget()
+        if (entry == null) {
+            message = "Сначала импортируйте тему — без файла проверять нечего"
+            return
+        }
+        viewModelScope.launch {
+            val result = ThemeInstaller.runCustom(
+                getApplication(), library.fileOf(entry), entry.title, activity,
+            )
+            diagLog = listOf(result.message) + diagLog
+            message = result.message
+        }
+    }
+
+    fun diagText(): String = buildString {
+        append(diag?.asText() ?: "")
+        if (diagLog.isNotEmpty()) {
+            appendLine()
+            appendLine("Что ответила система на каждый способ:")
+            diagLog.forEach { appendLine("  $it") }
+        }
+    }
+
+    fun clearLog() {
+        diagLog = emptyList()
     }
 
     fun openThemeManager() {
